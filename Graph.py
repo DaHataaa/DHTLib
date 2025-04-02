@@ -4,7 +4,7 @@ from math import*
 import time
 import random
 
-import PygameFW.PygameFW as fw
+import PygameFW as fw
 
 
 
