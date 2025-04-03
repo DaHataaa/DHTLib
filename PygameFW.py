@@ -336,7 +336,7 @@ class Text:
 		font_size=24,
 		color=(0,0,0),
 		value='',
-		font='PygameFW/PgFW_font.ttf',
+		font='DHTLib/PgFW_font.ttf',
 		visible=True
 		):
 
@@ -389,7 +389,7 @@ class InputBox_Line:
 		dy = 100,
 		font_color=(0,0,0),
 		value='',
-		font='PygameFW/PgFW_font.ttf',
+		font='DHTLib/PgFW_font.ttf',
 		border_size = 3,
 		color_border = (100,100,100),
 		color_border_covered = (210,80,80),

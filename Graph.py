@@ -4,31 +4,27 @@ from math import*
 import time
 import random
 
-import PygameFW as fw
+import DHTLib.PygameFW as fw
 
 
 
 
 
-
-
-
-
-
-
-
-
-
+def dist(x1, y1, x2, y2):
+    return ((x1 - x2)**2 + (y1 - y2)**2)**0.5
 
 
 
 class Func:
-    def __init__(self, func, name, color=None, width=3):
+    def __init__(self, func, name, color=None, width=3, points=[]):
         self.name = name
         self.color = color
         self.width = width
         self.func = func
         self.visible = True
+
+        self.points = points
+        self.points.sort()
 
         if color == None:
             random.seed(time.time())
@@ -42,6 +38,22 @@ class Func:
         return eval(self.func)
 
 
+
+class Point:
+    def __init__(self, x, y, name, color=None, width=6):
+        self.name = name
+        self.color = color
+        self.width = width
+        self.x = x
+        self.y = y
+        self.visible = True
+
+        if color == None:
+            random.seed(time.time())
+            r = random.randint(0,255)
+            g = int(str(random.randint(1000,1255))[1:])
+            b = int(str(random.randint(10000,10255))[2:])
+            self.color = (r, g, b)
 
 
 
@@ -87,6 +99,11 @@ class Graph:
         self.show_grid = False
         self.show_cursor_pos = False
 
+        self.points_stack = []
+
+        self.cursor_x = 0
+        self.cursor_y = 0
+
         self.aa = False
 
         self.funcs = []
@@ -121,7 +138,6 @@ class Graph:
 
 
 
-
     def line(self, x, y , x2, y2, color, width):
         pygame.draw.line(self.screen, color, (x,y), (x2,y2), width)
 
@@ -138,6 +154,10 @@ class Graph:
         out = self.font[size].render(text, 1, color)
         self.screen.blit(out, (x,y))
 
+
+    def add_points(self, points):
+        for i in range(len(points)):
+            self.points.append(points[i])
 
 
     def add_funcs(self, funcs):
@@ -158,6 +178,24 @@ class Graph:
         return x, y
 
 
+
+    def render_points(self):
+        if self.points == []:
+            return 0
+
+
+        for i in range(len(self.points)):
+            p = self.points[i]
+
+            x_screen, y_screen = self.calc_point_to_screen(p.x, p.y)
+
+            if p.visible:
+
+                if y_screen > 0 and y_screen < self.height:
+                    self.circle(x_screen, y_screen, p.color, p.width)
+
+
+
     def render_funcs(self):
         if self.funcs == []:
             return 0
@@ -173,7 +211,35 @@ class Graph:
             x_screen_prev = 0
             y_screen_prev = 0
 
+            
             if f.visible:
+
+
+                if f.points != []:
+                    for i in range(len(f.points)):
+                        px_soa = f.points[i]
+
+                        try:
+                            py_soa = f.F(px_soa)
+                        except:
+                            py_soa = f.F(px_soa+0.001)
+
+
+
+
+                        px_screen, py_screen = self.calc_point_to_screen(px_soa, py_soa)
+
+
+                        width_k = 1
+                        if dist(px_screen, py_screen, self.mouse_x, self.mouse_y) < 20:
+                            self.points_stack.append([px_screen, py_screen])
+                            width_k = 1.5
+
+
+                        if py_screen > 0 and py_screen < self.height:
+                            self.circle(px_screen, py_screen, f.color, int(f.width*2*width_k))
+
+
 
                 while x_screen <= self.width:
                     
@@ -185,7 +251,9 @@ class Graph:
                     except:
                         y_soa = f.F(x_soa+0.001)
 
+
                     y_screen = self.calc_point_to_screen(0,y_soa)[1]
+
 
                     if (y_screen_prev > 0 and y_screen_prev < self.height or 
                         y_screen > 0 and y_screen < self.height):
@@ -194,18 +262,20 @@ class Graph:
                         else:
                             self.line(x_screen_prev, y_screen_prev, x_screen, y_screen, f.color, f.width)
 
+                    
+
                     x_screen_prev = x_screen
                     y_screen_prev = y_screen
-                    
+
 
                     x_screen += self.res
 
 
-    
+
 
     def draw_axes(self):
-        self.line(self.zero_x, 0, self.zero_x, self.height, self.interface_color, 2)
-        self.line(0, self.zero_y, self.width, self.zero_y, self.interface_color, 2)
+        self.line(self.zero_x, 0, self.zero_x, self.height, self.interface_color, 3)
+        self.line(0, self.zero_y, self.width, self.zero_y, self.interface_color, 3)
 
 
     def draw_grid(self):
@@ -216,7 +286,7 @@ class Graph:
         step = self.ppu / div
 
 
-        for i in range(25):
+        for i in range(35):
 
             x = i*step + (self.zero_x % step)
             y = i*step + (self.zero_y % step)
@@ -233,14 +303,29 @@ class Graph:
 
 
     def draw_cursor_pos(self):
-        self.line(self.mouse_x, self.mouse_y, self.mouse_x, self.zero_y, self.interface_color, 1)
-        self.line(self.mouse_x, self.mouse_y, self.zero_x, self.mouse_y, self.interface_color, 1)
+        if self.points_stack != []:
+            self.cursor_x = self.points_stack[0][0]
+            self.cursor_y = self.points_stack[0][1]
+        else:
+            self.cursor_x = self.mouse_x
+            self.cursor_y = self.mouse_y
 
-        cords = str('(' + 
-            str(round(self.calc_point_to_soa(self.mouse_x,0)[0], 3)) + '; ' +
-            str(round(self.calc_point_to_soa(0, self.mouse_y)[1], 3)) + ')')
 
-        self.textout(self.mouse_x, self.mouse_y-24, 24, self.interface_color, cords)
+        if self.show_cursor_pos:
+            self.line(self.cursor_x, self.cursor_y, self.cursor_x, self.zero_y, self.interface_color, 2)
+            self.line(self.cursor_x, self.cursor_y, self.zero_x, self.cursor_y, self.interface_color, 2)
+
+
+
+        if self.points_stack != [] or self.show_cursor_pos:
+            cords = str('(' + 
+                str(round(self.calc_point_to_soa(self.cursor_x,0)[0], 3)) + '; ' +
+                str(round(self.calc_point_to_soa(0, self.cursor_y)[1], 3)) + ')')
+
+            self.textout(self.cursor_x+5, self.cursor_y-24, 24, self.interface_color, cords)
+
+
+        self.points_stack = []
 
 
     def draw_interface(self):
@@ -266,8 +351,6 @@ class Graph:
 
         
 
-        
-
     def mouse_events(self):
         if self.mouse_touching_r:
             self.zero_x += self.mouse_dx
@@ -287,7 +370,6 @@ class Graph:
         if self.epilepsy:
             self.interface_color = (random.randint(0,255),random.randint(0,255),random.randint(0,255))
             self.bg_color = (random.randint(0,255),random.randint(0,255),random.randint(0,255))
-
 
 
 
@@ -367,11 +449,11 @@ class Graph:
             if self.show_axes:
                 self.draw_axes()
 
-            if self.show_cursor_pos:
-                self.draw_cursor_pos()
+            self.draw_cursor_pos()
 
 
             self.render_funcs()
+            self.render_points()
 
             self.draw_interface()
 
@@ -400,14 +482,12 @@ class Graph:
                     if event.button == 4:
                         self.mouse_scrolling_u = True
 
-                        if self.ppu < 80000:
+                        if self.ppu < 90000:
 
                             self.zero_x -= (self.mouse_x-self.zero_x) * 0.15
                             self.zero_y -= (self.mouse_y-self.zero_y) * 0.15
 
                             self.ppu = round(self.ppu * 1.15, 3)
-
-                        
 
 
                     if event.button == 5:
@@ -419,9 +499,7 @@ class Graph:
                             self.zero_y += (self.mouse_y-self.zero_y) * 0.15
 
                             self.ppu =  round(self.ppu * 0.85, 3)
-
                         
-
 
                 if event.type == pygame.MOUSEBUTTONUP:
                     if event.button == 1:
